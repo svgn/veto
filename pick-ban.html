@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>FIFA Ban & Pick Draft</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+            }
+            h1,
+            h2,
+            h3 {
+                text-align: center;
+            }
+            #setup {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            #setup input {
+                margin: 0 10px;
+                padding: 8px;
+                width: 150px;
+            }
+            #setup button {
+                padding: 10px 20px;
+                font-size: 16px;
+                margin-top: 10px;
+            }
+            .turn-info {
+                text-align: center;
+                font-size: 1.5em;
+                font-weight: bold;
+                margin-bottom: 15px;
+            }
+            .team-card {
+                margin: 10px;
+                padding: 10px;
+                border: 2px solid #ccc;
+                text-align: center;
+                width: 120px;
+                height: 120px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+                transition: 0.2s;
+                background-color: white;
+            }
+            .team-card img {
+                max-height: 90px;
+                max-width: 90px;
+                object-fit: contain;
+            }
+            .team-card.banned {
+                background-color: #e74c3c;
+                color: white;
+                cursor: not-allowed;
+            }
+            .team-card.picked {
+                background-color: #2ecc71;
+                color: white;
+                cursor: not-allowed;
+            }
+            #teams {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .center {
+                text-align: center;
+                margin-top: 30px;
+            }
+            button.rematch {
+                padding: 10px 20px;
+                font-size: 16px;
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            button.rematch:hover {
+                background-color: #2980b9;
+            }
+            #final-picks {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 40px;
+                gap: 50px;
+            }
+            .player-final {
+                text-align: center;
+            }
+            .player-final img {
+                height: 100px;
+                margin-bottom: 10px;
+            }
+            .player-name {
+                font-size: 1em;
+                font-weight: bold;
+            }
+            .vs {
+                font-size: 2em;
+                font-weight: bold;
+            }
+            #loading-indicator {
+                display: none;
+                text-align: center;
+                margin-top: 20px;
+            }
+            .spinner-football {
+                animation: spin 1s linear infinite;
+                margin: 0 auto 10px;
+            }
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+            @media (max-width: 600px) {
+                #final-picks {
+                    flex-direction: column;
+                    gap: 20px;
+                }
+                .vs {
+                    display: none;
+                }
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    </head>
+    <body>
+        <h1>FIFA Ban & Pick Draft</h1>
+        <div id="setup">
+            <input type="text" id="player1" placeholder="Player A Name" />
+            <input type="text" id="player2" placeholder="Player B Name" />
+            <br />
+            <button onclick="startDraft()">Start Draft</button>
+        </div>
+        <div id="loading-indicator">
+            <img
+                src="https://upload.wikimedia.org/wikipedia/commons/6/6e/Football_%28soccer_ball%29.svg"
+                alt="Loading"
+                class="spinner-football"
+                width="40"
+                height="40"
+            />
+            <p><em>Random bans in progress...</em></p>
+        </div>
+        <div id="draft" style="display: none">
+            <div class="turn-info" id="turn-info">Player A, ban a team</div>
+            <div id="teams"></div>
+        </div>
+        <div id="status" style="display: none">
+            <h3>Banned Teams</h3>
+            <ul id="banned-list"></ul>
+            <h3>Picked Teams</h3>
+            <ul id="picked-list"></ul>
+        </div>
+        <div id="final-picks" style="display: none">
+            <div class="player-final">
+                <img id="final1-logo" src="" alt="Player 1 pick" />
+                <div class="player-name" id="name1-label"></div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="player-final">
+                <img id="final2-logo" src="" alt="Player 2 pick" />
+                <div class="player-name" id="name2-label"></div>
+            </div>
+        </div>
+        <div id="rematch-btn" class="center" style="display: none">
+            <button class="rematch" onclick="resetDraft()">🔁 Rematch</button>
+        </div>
+        <script>
+            const teamData = [
+                {
+                    name: "Manchester City",
+                    logo: "https://upload.wikimedia.org/wikipedia/en/e/eb/Manchester_City_FC_badge.svg",
+                },
+                {
+                    name: "Atletico Madrid",
+                    logo: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f9/Atletico_Madrid_Logo_2024.svg/310px-Atletico_Madrid_Logo_2024.svg.png",
+                },
+                {
+                    name: "Barcelona",
+                    logo: "https://upload.wikimedia.org/wikipedia/en/4/47/FC_Barcelona_%28crest%29.svg",
+                },
+                {
+                    name: "FC Bayern",
+                    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/FC_Bayern_M%C3%BCnchen_logo_%282024%29.svg/400px-FC_Bayern_M%C3%BCnchen_logo_%282024%29.svg.png",
+                },
+                { name: "Liverpool", logo: "https://upload.wikimedia.org/wikipedia/en/0/0c/Liverpool_FC.svg" },
+                { name: "Arsenal", logo: "https://upload.wikimedia.org/wikipedia/en/5/53/Arsenal_FC.svg" },
+                { name: "PSG", logo: "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg" },
+                {
+                    name: "Inter Milan",
+                    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/FC_Internazionale_Milano_2021.svg/400px-FC_Internazionale_Milano_2021.svg.png",
+                },
+            ];
+
+            let teams, bannedTeams, pickedTeams, phase;
+            let banSteps = ["P1", "P2", "R1", "R2", "P1", "P2"];
+            let pickSteps = ["P1", "P2"];
+            let stepIndex = 0;
+            let playerNames = { P1: "Player A", P2: "Player B" };
+            let randomBansTriggered = false;
+
+            function startDraft() {
+                const p1 = document.getElementById("player1").value.trim() || "Player A";
+                const p2 = document.getElementById("player2").value.trim() || "Player B";
+                playerNames = { P1: p1, P2: p2 };
+                document.getElementById("name1-label").textContent = p1;
+                document.getElementById("name2-label").textContent = p2;
+                document.getElementById("setup").style.display = "none";
+                document.getElementById("draft").style.display = "block";
+                document.getElementById("status").style.display = "block";
+                teams = [...teamData];
+                bannedTeams = [];
+                pickedTeams = [];
+                phase = "ban";
+                stepIndex = 0;
+                renderTeams();
+                updateInfo();
+            }
+
+            function renderTeams() {
+                const teamsDiv = document.getElementById("teams");
+                teamsDiv.innerHTML = "";
+                teams.forEach((team) => {
+                    const card = document.createElement("div");
+                    card.className = "team-card";
+                    const img = document.createElement("img");
+                    img.src = team.logo;
+                    img.alt = team.name;
+                    const isBanned = bannedTeams.find((t) => t.team === team.name);
+                    const isPicked = pickedTeams.find((t) => t.team === team.name);
+                    if (isBanned) {
+                        card.classList.add("banned");
+                    } else if (isPicked) {
+                        card.classList.add("picked");
+                    } else {
+                        card.onclick = () => handleTeamClick(team.name);
+                    }
+                    card.appendChild(img);
+                    teamsDiv.appendChild(card);
+                });
+            }
+
+            function updateInfo() {
+                const turnInfo = document.getElementById("turn-info");
+                if (phase === "ban") {
+                    const current = banSteps[stepIndex];
+                    if (current === "R1" && !randomBansTriggered) {
+                        triggerRandomBans();
+                        return;
+                    }
+                    if (current.startsWith("P")) {
+                        turnInfo.textContent = `${playerNames[current]}, ban a team`;
+                    }
+                } else if (phase === "pick") {
+                    const current = pickSteps[stepIndex];
+                    turnInfo.textContent = `${playerNames[current]}, pick a team`;
+                }
+            }
+
+            function triggerRandomBans() {
+                randomBansTriggered = true;
+                document.getElementById("loading-indicator").style.display = "block";
+                const turnInfo = document.getElementById("turn-info");
+                turnInfo.textContent = "Randomly banning...";
+                const available = teams.filter(
+                    (t) => !bannedTeams.find((b) => b.team === t.name) && !pickedTeams.find((p) => p.team === t.name)
+                );
+                const shuffled = available.sort(() => 0.5 - Math.random());
+                const first = shuffled[0];
+                const second = shuffled[1];
+
+                setTimeout(() => {
+                    bannedTeams.push({ team: first.name, player: "Random" });
+                    renderTeams();
+                    updateLists();
+                    turnInfo.textContent = `Banned: ${first.name}`;
+                }, 1000);
+
+                setTimeout(() => {
+                    bannedTeams.push({ team: second.name, player: "Random" });
+                    renderTeams();
+                    updateLists();
+                    turnInfo.textContent = `Banned: ${second.name}`;
+                    stepIndex += 2;
+                    if (stepIndex >= banSteps.length) {
+                        phase = "pick";
+                        stepIndex = 0;
+                    }
+                    document.getElementById("loading-indicator").style.display = "none";
+                    setTimeout(updateInfo, 1000);
+                }, 3000);
+            }
+
+            function handleTeamClick(teamName) {
+                if (bannedTeams.find((t) => t.team === teamName) || pickedTeams.find((t) => t.team === teamName))
+                    return;
+                if (phase === "ban") {
+                    const player = banSteps[stepIndex];
+                    if (player.startsWith("P")) {
+                        bannedTeams.push({ team: teamName, player });
+                        stepIndex++;
+                        if (stepIndex >= banSteps.length) {
+                            phase = "pick";
+                            stepIndex = 0;
+                        }
+                    }
+                } else if (phase === "pick") {
+                    const player = pickSteps[stepIndex];
+                    pickedTeams.push({ team: teamName, player });
+                    stepIndex++;
+                }
+                renderTeams();
+                updateLists();
+                if (phase === "pick" && stepIndex >= pickSteps.length) {
+                    document.getElementById("turn-info").textContent = "Draft complete!";
+                    showFinalPicks();
+                } else {
+                    updateInfo();
+                }
+            }
+
+            function updateLists() {
+                const bannedList = document.getElementById("banned-list");
+                const pickedList = document.getElementById("picked-list");
+                bannedList.innerHTML = "";
+                pickedList.innerHTML = "";
+                bannedTeams.forEach((t) => {
+                    const li = document.createElement("li");
+                    li.textContent = `${t.team} (${t.player === "Random" ? "Random" : playerNames[t.player]})`;
+                    bannedList.appendChild(li);
+                });
+                pickedTeams.forEach((t) => {
+                    const li = document.createElement("li");
+                    li.textContent = `${t.team} (${playerNames[t.player]})`;
+                    pickedList.appendChild(li);
+                });
+            }
+
+            function showFinalPicks() {
+                document.getElementById("final-picks").style.display = "flex";
+                const final1 = pickedTeams.find((t) => t.player === "P1");
+                const final2 = pickedTeams.find((t) => t.player === "P2");
+                document.getElementById("final1-logo").src = getTeamLogo(final1?.team);
+                document.getElementById("final2-logo").src = getTeamLogo(final2?.team);
+                document.getElementById("rematch-btn").style.display = "block";
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+
+            function getTeamLogo(teamName) {
+                const team = teamData.find((t) => t.name === teamName);
+                return team ? team.logo : "";
+            }
+
+            function resetDraft() {
+                location.reload();
+            }
+            
+            // Enable Enter key to trigger startDraft()
+            document.addEventListener("DOMContentLoaded", () => {
+                const inputs = document.querySelectorAll("#player1, #player2");
+                inputs.forEach((input) => {
+                    input.addEventListener("keydown", (e) => {
+                        if (e.key === "Enter") startDraft();
+                    });
+                });
+            });
+        </script>
+    </body>
+</html>
